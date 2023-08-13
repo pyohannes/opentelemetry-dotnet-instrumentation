@@ -109,25 +109,17 @@ internal static class Instrumentation
                 EnvironmentConfigurationSdkHelper.UseEnvironmentVariables(SdkSettings.Value);
             }
 
+            TracerProviderBuilder? tracerProviderBuilder = default;
+
             if (TracerSettings.Value.TracesEnabled)
             {
                 if (GeneralSettings.Value.SetupSdk)
                 {
-                    var builder = Sdk
+                    tracerProviderBuilder = Sdk
                         .CreateTracerProviderBuilder()
                         .InvokePluginsBefore(_pluginManager)
                         .SetResourceBuilder(ResourceConfigurator.CreateResourceBuilder(GeneralSettings.Value.EnabledResourceDetectors))
-                        .UseEnvironmentVariables(LazyInstrumentationLoader, TracerSettings.Value, _pluginManager)
-                        .InvokePluginsAfter(_pluginManager);
-
-                    _tracerProvider = builder.Build();
-                    _tracerProvider.TryCallInitialized(_pluginManager);
-                    Logger.Information("OpenTelemetry tracer initialized.");
-                }
-                else
-                {
-                    AddLazilyLoadedTraceInstrumentations(LazyInstrumentationLoader, _pluginManager, TracerSettings.Value);
-                    Logger.Information("Initialized lazily-loaded trace instrumentations without initializing sdk.");
+                        .UseEnvironmentVariables(LazyInstrumentationLoader, TracerSettings.Value, _pluginManager);
                 }
             }
 
@@ -151,6 +143,23 @@ internal static class Instrumentation
                     AddLazilyLoadedMetricInstrumentations(LazyInstrumentationLoader, MetricSettings.Value.EnabledInstrumentations);
 
                     Logger.Information("Initialized lazily-loaded metric instrumentations without initializing sdk.");
+                }
+            }
+
+            if (TracerSettings.Value.TracesEnabled && tracerProviderBuilder != null)
+            {
+                if (GeneralSettings.Value.SetupSdk)
+                {
+                    tracerProviderBuilder.InvokePluginsAfter(_pluginManager);
+
+                    _tracerProvider = tracerProviderBuilder.Build();
+                    _tracerProvider.TryCallInitialized(_pluginManager);
+                    Logger.Information("OpenTelemetry tracer initialized.");
+                }
+                else
+                {
+                    AddLazilyLoadedTraceInstrumentations(LazyInstrumentationLoader, _pluginManager, TracerSettings.Value);
+                    Logger.Information("Initialized lazily-loaded trace instrumentations without initializing sdk.");
                 }
             }
         }
